@@ -1,8 +1,7 @@
-#! Python 3.5.2
-# http://pythoncentral.io/introductory-tutorial-python-sqlalchemy/
-
-import os, sys #, MySQLdb
-from sqlalchemy import Table, Column, ForeignKey, Integer, String, Boolean
+import os
+import sys 
+# import MySQLdb
+from sqlalchemy import Table, Column, ForeignKey, Integer, String, Boolean, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
@@ -43,8 +42,13 @@ class TV_Series(Base):
     id = Column(Integer, primary_key=True)
     tvmaze_id = Column(Integer, unique=True, nullable=False)
     name = Column(String(100))
+    status = Column(String(20))
     api_url = Column(String(100))
-    web_url = Column(String(100))
+    next_episode_season = Column(Integer)
+    next_episode_number = Column(Integer)
+    next_episode_name = Column(String(50))
+    next_episode_date = Column(Date)
+    next_episode_api_url = Column(String(100))
     
     # Relationships
     followed_by = relationship('Follow', cascade='all, delete-orphan', back_populates='tv_series')

@@ -1,22 +1,18 @@
-import requests, time, re, os#, jarvis_bot
-# from urllib import parse
+import json
+import requests
+import re
+import os
+import logging
 from datetime import datetime, date
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from db_schema import Base, User, TV_Series, Follow
 
+# setup logging
+logger = logging.getLogger('main.tvmaze')
+
 # Constants
-API_URL = 'http://api.tvmaze.com'
-
-# Database connection settings
-engine = create_engine('sqlite:///tvmaze.db')
-
-# connection_string = "mysql://root:" + os.environ['JARVIS_DB_PW'] + "@127.0.0.1:3306/jarvis"
-# connection_string = "mysql://root:" + os.environ['JARVIS_DB_PW'] + "@127.0.0.1:3306/jarvis_test"
-# engine = create_engine(connection_string)
-
-Base.metadata.bind = engine
-DBSession = sessionmaker(bind=engine)
+API_URL = 'https://api.tvmaze.com'
 
 
 def search_for_series(text):
@@ -26,7 +22,7 @@ def search_for_series(text):
         'options': []
     }
 
-    print ('Starting dynamic search for \'' + text + '\'')
+    logger.info('Starting dynamic search for \'' + text + '\'')
 
     search_results = requests.get(series_search_url)
     status_code = search_results.status_code
@@ -41,7 +37,7 @@ def search_for_series(text):
     # else:
     #     for_loop_count = series_list.count
 
-    print ('Filtering out weak matches...')
+    logger.info('Filtering out weak matches...')
     
     for series in series_list:
         if series.get('score') >= 3:
@@ -59,9 +55,10 @@ def search_for_series(text):
             }
             payload.get('options').append(option)
 
-    print ('Lookahead payload is completely generated.')
+    logger.info('Lookahead payload is completely generated.')
 
     return payload
+
 
 def get_series_data_via_id(series_id):
     series_lookup_url = API_URL + '/shows/' + str(series_id)
@@ -75,13 +72,15 @@ def get_series_data_via_id(series_id):
     return series_data.json()
 
 
-# TVmaze uses a scoring system to determine the best TV series match for a user's search.
-# This search will return a dictionary object with information about the matched series.
 def get_series_data(series_name):
+
+    # TVmaze uses a scoring system to determine the best TV series match for a user's search.
+    # This search will return a dictionary object with information about the matched series.
+
     #series_search_url = API_URL + '/singlesearch/shows?q=' + parse.quote_plus(series_name)
     series_search_url = API_URL + '/singlesearch/shows?q=' + series_name
 
-    print(str(datetime.now()) + "  Beginning a new search for '" + series_name + "'")
+    logger.info("Beginning a new search for '<%s>'", series_name)
 
     series_data = requests.get(series_search_url)
     status_code = series_data.status_code
@@ -96,8 +95,7 @@ def get_series_data(series_name):
 
 def get_episode_data (episode_url):
 
-    print(str(datetime.now()) + "  Requesting episode found at " + \
-          episode_url)
+    logger.info("Requesting episode found at " + episode_url)
 
     episode_data = requests.get(episode_url)
 
@@ -113,10 +111,9 @@ def follow_series(series_name, user_id, user_name):
     if type(series_data) != dict:
         return series_data
 
-    session = DBSession()
+    session = create_db_session()
 
-    print(str(datetime.now()) + "  Checking to see if TV Series and User already exist "
-                                "in the database...")
+    logger.info("Checking to see if TV Series and User already exist in the database...")
     tv_series = session.query(TV_Series). \
         filter_by(tvmaze_id=series_id). \
         first()
@@ -125,19 +122,41 @@ def follow_series(series_name, user_id, user_name):
         first()
 
     if not tv_series:
-        print(str(datetime.now()) + " TV Series '" + series_name + "' with "
+        logger.info("TV Series '" + series_name + "' with "
             "ID '" + str(series_id) + "' did not exist in database. Creating"
             " an entry now.")
+        
+        try:
+            next_episode_api_url = series_data['_links']['nextepisode']['href']
+        except KeyError:
+            next_episode_api_url = None
+            next_episode_season = None
+            next_episode_number = None
+            next_episode_name = None
+            next_episode_date = None
+
+        if next_episode_api_url:
+            episode_data = requests.get(next_episode_api_url).json()
+            next_episode_season = episode_data.get('season')
+            next_episode_number = episode_data.get('number')
+            next_episode_name = episode_data.get('name')
+            next_episode_date = datetime.strptime(episode_data.get('airdate'), '%Y-%m-%d')
+
         tv_series = TV_Series(
             tvmaze_id=series_id,
             name=series_name,
+            status=series_data.get('status'),
             api_url=series_data['_links'].get('self')['href'],
-            web_url=series_data.get('url')
+            next_episode_season=next_episode_season,
+            next_episode_number=next_episode_number,
+            next_episode_name=next_episode_name,
+            next_episode_date=next_episode_date,
+            next_episode_api_url=next_episode_api_url
         )
         session.add(tv_series)
 
     if not user:
-        print(str(datetime.now()) + " User '" + str(user_id) + "' did not exist in database. Creating an entry now.")
+        logger.info("User '" + str(user_id) + "' did not exist in database. Creating an entry now.")
         user = User(
             slack_id=user_id,
             slack_name=user_name)
@@ -149,7 +168,7 @@ def follow_series(series_name, user_id, user_name):
         first()
 
     if not follow_status:
-        print(str(datetime.now()) + " User '" + str(user.slack_id) + "' and TV Series '" + \
+        logger.info("User '" + str(user.slack_id) + "' and TV Series '" + \
               tv_series.name + "' did not have a joint table entry. Creating an entry now.")
         follow_status = Follow(
             tv_series_id=tv_series.id,
@@ -189,7 +208,7 @@ def unfollow_series(series_name, user_id, user_name):
     series_data = get_series_data(series_name)
     series_id = series_data.get('id')
 
-    session = DBSession()
+    session = create_db_session()
 
     tv_series = session.query(TV_Series). \
         filter_by(tvmaze_id=series_id). \
@@ -239,9 +258,9 @@ def create_watchlist_output(user_id):
     return string with list of TV shows
     '''
 
-    session = DBSession()
+    session = create_db_session()
 
-    print ("Looking for user in database")
+    logger.info("Looking for user in database")
 
     user = session.query(User). \
         filter_by(slack_id=user_id). \
@@ -251,7 +270,7 @@ def create_watchlist_output(user_id):
         return ("You're not following any TV shows yet. Please use the `follow` command "
                "to follow some TV shows first")
 
-    print ("Querying the user's watchlist")
+    logger.info("Querying the user's watchlist")
 
     watchlist = session.query(Follow). \
         filter_by(user_id=user.id). \
@@ -278,106 +297,40 @@ def create_watchlist_output(user_id):
         "text": output_string
     }
 
-    print (payload)
+    logger.info(payload)
     
     return payload
 
 
-def execute_daily_tasks():
-
-    daily_watchlist_notifications()
-    database_cleanup()
-
-
-def daily_watchlist_notifications():
-
-    print(str(datetime.now()) + "  Beginning notifications function.")
+def get_episodes_for_date(date):
 
     episodes_airing_today_url = API_URL + '/schedule?country=US&date='
-    date_today = date.today().strftime('%Y-%m-%d')
 
-    episodes_airing = request(episodes_airing_today_url + date_today)
+    response = requests.get(episodes_airing_today_url + date)
+    episodes_for_date = response.json()
 
+    return episodes_for_date
+
+
+def create_db_session():
+
+    # connection_string = "mysql://root:" + os.environ['JARVIS_DB_PW'] + "@127.0.0.1:3306/jarvis"
+    # connection_string = "mysql://root:" + os.environ['JARVIS_DB_PW'] + "@127.0.0.1:3306/jarvis_test"
+    # engine = create_engine(connection_string)
+
+    engine = create_engine('sqlite:///tvmaze.db')
+    Base.metadata.bind = engine
+    DBSession = sessionmaker(bind=engine)
     session = DBSession()
 
-    all_series = session.query(TV_Series).all()
-    messages = {}
-
-    print(str(datetime.now()) + "  Searching through database for episodes airing today.")
-
-    for series in all_series:
-        for episode in episodes_airing:
-            if series.tvmaze_id == episode['show']['id']:
-                followers_list = session.query(Follow). \
-                    filter_by(tv_series_id=series.id). \
-                    filter_by(is_following=True). \
-                    all()
-
-                print(str(datetime.now()) + "  " + str(len(followers_list)) + " person(s) are following " +
-                      episode.get('show').get('name'))
-
-                for follower in followers_list:
-                    follower = session.query(User). \
-                        filter_by(id=follower.user_id). \
-                        first()
-
-                    new_message = " - `" + episode['show']['name'] + \
-                        "` (season " + str(episode['season']) + \
-                        " episode " + str(episode['number']) + ")\n"
-
-                    if messages.get(follower.slack_id):
-                        messages[follower.slack_id] += new_message
-
-                    else:
-                        messages[follower.slack_id] = \
-                            "*TV Shows from your watchlist airing today (" + \
-                            date_today + "):* \n\n" + new_message
-
-    for user, message in messages.items():
-        print(user + "\n" + message + "\n")
-
-    slack_bot.notifications(messages)
-    session.close()
+    return session
 
 
-def database_cleanup():
-
-    '''
-    find tv series and users no longer used
-    for each tv series in database...
-    query follow table for tv series where no "is_following" fields are True
-    '''
-
-    print(str(datetime.now()) + "  Starting database cleanup.")
-
-    session = DBSession()
-
-    series_list = session.query(TV_Series).all()
-
-    for series in series_list:
-        series_followers = session.query(Follow). \
-            filter_by(tv_series_id=series.id). \
-            filter_by(is_following=True). \
-            all()
-        if len(series_followers) == 0:
-            print(series.name + " has 0 followers. Marking for removal from database.")
-            session.query(Follow). \
-                filter_by(tv_series_id=series.id). \
-                delete()
-            session.query(TV_Series). \
-                filter_by(id=series.id). \
-                delete()
-
-    session.commit()
-    session.close()
-
-    print(str(datetime.now()) + "  Database cleanup complete.")
+# if __name__ == "__main__":
 
 
-if __name__ == "__main__":
 
-    execute_daily_tasks()
-
+### CHANGE DAILY NOTIFICATIONS BACK TO DATE VARIABLE (RATHER THAN STATIC)
 
 '''
 To do:
@@ -388,12 +341,6 @@ When a new user is added, it should automatically create follow associations to 
     This will likely involve branching each task into a separate function (i.e. segreating from the follow_series function)
     When that is done, I can slim down and deduplicate the existing if/then tree in follow_series function
 
-
-
-* add to github
-* apps vs. bots research
-
-* command list - @jarvis help
 * consolidate repetitive code in 'follow_series' function
 * consolidate repetitive code between 'follow_series' and 'unfollow_series'
 * create notifications function and add to slack_loop or schedule

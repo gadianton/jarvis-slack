@@ -11,6 +11,7 @@ import xml.etree.cElementTree as ET
 from datetime import datetime
 from slackclient import SlackClient
 from flask import Flask, request, Response, jsonify, json
+from sys import exit
 
 
 # Declare constants
@@ -19,12 +20,11 @@ from flask import Flask, request, Response, jsonify, json
 # https://slackapi.github.io/python-slackclient/auth.html#handling-tokens
 
 app = Flask(__name__)
-# VERIFICATION_TOKEN = os.environ.get('JARVIS_VERIFICATION_TOKEN')
-# SIGNING_SECRET = os.environ.get('JARVIS_SIGNING_SECRET')
-# BOT_OAUTH_TOKEN = os.environ.get('JARVIS_BOT_OAUTH')
-OAUTH_TOKEN = os.environ.get('JARVIS_OAUTH_TOKEN')
-
-slack_client = SlackClient(OAUTH_TOKEN)
+# # VERIFICATION_TOKEN = os.environ.get('JARVIS_VERIFICATION_TOKEN')
+# # SIGNING_SECRET = os.environ.get('JARVIS_SIGNING_SECRET')
+# # BOT_OAUTH_TOKEN = os.environ.get('JARVIS_BOT_OAUTH')
+# OAUTH_TOKEN = os.environ.get('JARVIS_OAUTH_TOKEN')
+# slack_client = SlackClient(OAUTH_TOKEN)
 
 headers = {
     'Content-Type': 'application/json',
@@ -77,6 +77,7 @@ def tv_main_menu():
     }
 
     return jsonify(payload)
+
 
 def create_search_box():
 
@@ -132,6 +133,7 @@ def get_series_data():
             payload = create_series_output(series_data, user_name)
     
     return jsonify(payload)
+
 
 def create_series_output(series_data, user_name):
 
@@ -310,7 +312,7 @@ def test():
 
 
 if __name__ == "__main__":
-    app.run(port=5050, debug=True)
+    app.run()
 
 
 
