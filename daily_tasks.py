@@ -147,59 +147,89 @@ def format_watchlist_report(watchlist_data):
 
     watchlist_reports = {}
     for slack_id, watchlist in watchlist_data.items():
-        user_report = '*Scheduled Next Episodes*'
-        
+
         scheduled_episodes = {}
         today = date.today()
         for series in watchlist[watchlist_categories['known']].values():
             days_until = (series['next_episode_date'] - today).days
-            notification = '\n`{}` S{} E{} in {} days ({})'.format(
-                series['series_name'], series['next_episode_season'], \
-                series['next_episode_number'], days_until, \
-                str(series['next_episode_date'])
+            notification = '{} `s{}.e{}`'.format(
+                series['series_name'], \
+                str(series['next_episode_season']).zfill(2), \
+                str(series['next_episode_number']).zfill(2)
             )
             if series['next_episode_number'] == 1:
-                notification += ' *SEASON PREMIER*'
+                notification += '    :tada:'
             scheduled_episodes[notification] = days_until
-            
-        ### REDUCE REPITITION IN FOLLOWING LINES
+
         sorted_dict = sorted(scheduled_episodes.items(), key=lambda kv: kv[1])
         ordered_schedule = collections.OrderedDict(sorted_dict)
-        for notification in ordered_schedule.keys():
-            user_report += notification
 
-        user_report += '\n\n*Unscheduled Next Episodes*'
-        for series in watchlist[watchlist_categories['unknown']].values():
-            notification = '\n`{}`'.format(series['series_name'])
-            user_report += notification
-
-        user_report += '\n\n*Cancelled Shows*'
-        for series in watchlist[watchlist_categories['cancelled']].values():
-            notification = '\n`{}`'.format(series['series_name'])
-            user_report += notification
+        user_report = '*TODAY*'
+        episodes = [k for k,v in ordered_schedule.items() if v == 0]
+        if episodes:
+            for episode in episodes:
+                user_report += '\n>{}'.format(episode)
+        else:
+            user_report += '\n_Read a book_'
+        
+        user_report += '\n\n*TOMMOROW*'
+        episodes = [k for k,v in ordered_schedule.items() if v == 1]
+        if episodes:
+            for episode in episodes:
+                user_report += '\n>{}'.format(episode)
+        else:
+            user_report += '\n_Read a book_'
+        
+        user_report += '\n\n*LATER*'
+        for notification, days_until in ordered_schedule.items():
+            if days_until > 1:
+                user_report += '\n>[{}d] {}'.format(
+                    days_until, notification
+                )
 
         watchlist_reports[slack_id] = user_report
 
     logger.info('Finished formatting watchlist reports')
-        
+
     return watchlist_reports
-            
+
 
 def send_watchlist_reports(watchlist_reports):
 
     logger.info('Sending watchlist reports')
 
     slack_client = authenticate_slack('bot_token')
-
-    for slack_id, message in watchlist_reports.items():
+ 
+    for slack_id, user_report in watchlist_reports.items():
         response = slack_client.api_call('im.open', user=slack_id)
         if response.get('ok'):
             channel_id = response.get('channel').get('id')
-            slack_client.api_call('chat.postMessage', channel=channel_id, text=message, as_user=True)
+            blocks = [
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": "Daily watchlist report"
+                        }
+                    ]
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": user_report
+                    }
+                }
+            ]
+            slack_client.api_call('chat.postMessage', channel=channel_id, blocks=blocks, as_user=True)
+        
         else:
             logger.error("Unable to send notification message to <%s>. Response error: <%s>", slack_id, response.get('error'))
 
     logger.info('Finished sending watchlist reports')
+
+    return
 
 
 def database_cleanup():
@@ -260,9 +290,6 @@ def import_json(file_path):
     return data
 
 
-
-
-
 if __name__ == "__main__":
 
     # setup logging
@@ -290,6 +317,6 @@ if __name__ == "__main__":
 
 # To do:
 
-# Limit modules to certain channels (e.g. Good-TV)
+# Create unfollow links in watchlist reports
 # Area for testing: categorization of shows for the report.
     # It's possible some shows without a next episode or "Running" status might not be cancelled (TBD)
