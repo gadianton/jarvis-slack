@@ -3,10 +3,6 @@ import requests
 import os
 import logging
 from random import choice
-from datetime import datetime, date
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from db_schema import Base, User, TV_Series, Follow
 
 # setup logging
 logger = logging.getLogger('main.thetvdb')
@@ -18,19 +14,20 @@ headers = {
 
 api_url = 'https://api.thetvdb.com'
 
+
 def create_tvdb_session():
 
+    logger.info("Authenticating with TheTVDB")
     login_endpoint = api_url + '/login'
-    config_file = 'config.json'
 
-    config_data = import_json(config_file)
-    apikey = config_data['tvdb_apikey']
+    apikey = os.environ['TVDB_APIKEY']
     payload = json.dumps({
         'apikey': apikey
     })
 
     response = requests.post(login_endpoint, data=payload, headers=headers)
     tvdb_token = response.json().get('token')
+    logger.info("Finished authenticating with TheTVDB")
 
     return tvdb_token
 
@@ -47,8 +44,10 @@ def get_series_banner(series_id):
     }
     headers['Authorization'] = 'Bearer {}'.format(tvdb_token)
 
+    logger.info("Sending request to TheTVDB")
     response = requests.get(endpoint, params=params, headers=headers)
     banners = response.json().get('data')
+    logger.info("Received banner data from TheTVDB.")
 
     highest_rating = {
         'image_url': '',
@@ -78,7 +77,7 @@ def get_series_banner(series_id):
     else:
         image_url = highest_rating['image_url']
 
-    logger.info('Found series banner.')
+    logger.info('Found best-reviewed series banner.')
     logger.debug('Series banner info:\n{}'.format(highest_rating))
 
     return image_url
@@ -94,12 +93,3 @@ def get_series_network(series_id):
     network = response.json().get('data').get('network')
 
     return network
-
-
-def import_json(file_path):
-
-    with open(file_path, 'r') as file:
-        data = json.loads(file.read())
-
-    return data
-

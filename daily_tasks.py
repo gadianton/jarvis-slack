@@ -1,11 +1,9 @@
 import requests
 import logging
-import json
 import collections
 from slack import post_message
 from datetime import date, datetime
-from tvmaze import get_episodes_for_date, create_db_session
-from db_schema import Base, User, TV_Series, Follow
+from db_schema import Base, User, TV_Series, Follow, create_db_session
 
 # static variables
 watchlist_categories = {

@@ -1,5 +1,3 @@
-import os
-import sys 
 import psycopg2
 from sqlalchemy import Table, Column, ForeignKey, Integer, String, Boolean, Date
 from sqlalchemy.ext.declarative import declarative_base

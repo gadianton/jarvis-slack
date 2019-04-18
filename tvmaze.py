@@ -1,9 +1,6 @@
-import json
 import requests
-import re
-import os
 import logging
-from datetime import datetime, date
+from datetime import datetime
 from db_schema import Base, User, TV_Series, Follow, create_db_session
 
 # setup logging
@@ -14,7 +11,6 @@ API_URL = 'https://api.tvmaze.com'
 
 
 def search_for_series(text):
-    # series_search_url = API_URL + '/search/shows?q=' + parse.quote_plus(text)
     series_search_url = API_URL + '/search/shows?q=' + text
     payload = {
         'options': []
@@ -28,15 +24,8 @@ def search_for_series(text):
     if status_code == 429:
         return ("The servers are busy. Try again in a few seconds.")
 
-    series_list = search_results.json()
-    
-    # if series_list.count >= 3:
-    #     for_loop_count = 3:
-    # else:
-    #     for_loop_count = series_list.count
-
     logger.info('Filtering out weak matches...')
-    
+    series_list = search_results.json()
     for series in series_list:
         if series.get('score') >= 3:
             series_name = series.get('show').get('name')
@@ -83,11 +72,9 @@ def get_series_data(series_name):
     # TVmaze uses a scoring system to determine the best TV series match for a user's search.
     # This search will return a dictionary object with information about the matched series.
 
-    #series_search_url = API_URL + '/singlesearch/shows?q=' + parse.quote_plus(series_name)
     series_search_url = API_URL + '/singlesearch/shows?q=' + series_name
 
     logger.info("Beginning a new search for '<%s>'", series_name)
-
     series_data = requests.get(series_search_url)
     status_code = series_data.status_code
 
@@ -104,7 +91,6 @@ def get_series_data(series_name):
 def get_episode_data(episode_url):
 
     logger.info("Requesting episode found at " + episode_url)
-
     episode_data = requests.get(episode_url)
 
     logger.info("Found episode.")
@@ -319,8 +305,6 @@ def get_episodes_for_date(date):
 
     return episodes_for_date
 
-
-### CHANGE DAILY NOTIFICATIONS BACK TO DATE VARIABLE (RATHER THAN STATIC)
 
 '''
 To do:

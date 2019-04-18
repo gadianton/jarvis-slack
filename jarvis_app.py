@@ -1,14 +1,11 @@
-import os
 import logging
 import tvmaze
 import thetvdb
 import xml.etree.cElementTree as ET
 from threading import Thread
-from time import sleep
 from slack import post_message, delete_message
 from datetime import datetime
 from flask import Flask, request, Response, jsonify, json
-from sys import exit
 
 app = Flask(__name__)
 

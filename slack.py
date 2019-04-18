@@ -1,12 +1,6 @@
 import os
-import requests
 import logging
-import json
-import collections
 from slackclient import SlackClient
-from datetime import date, datetime
-from tvmaze import get_episodes_for_date, create_db_session
-from db_schema import Base, User, TV_Series, Follow
 
 # setup logging
 logger = logging.getLogger('main.slack')
