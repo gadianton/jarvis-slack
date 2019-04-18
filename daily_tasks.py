@@ -223,7 +223,7 @@ if __name__ == "__main__":
     fh.setFormatter(formatter)
 
     ch = logging.StreamHandler()
-    ch.setLevel(logging.WARNING)
+    ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)
 
     logger = logging.getLogger('main')

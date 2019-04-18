@@ -1,4 +1,5 @@
 import psycopg2
+import os
 from sqlalchemy import Table, Column, ForeignKey, Integer, String, Boolean, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -55,19 +56,23 @@ class TV_Series(Base):
 
 def create_db_session():
 
-    # engine = create_engine('sqlite:///tvmaze.db')
-    engine = create_engine('postgresql://localhost/jarvis')
+    engine = create_db_engine()
     Base.metadata.bind = engine
     DBSession = sessionmaker(bind=engine)
     session = DBSession()
 
     return session
 
+def create_db_engine():
 
-# Create an engine that stores data in the local directory
-# engine = create_engine('sqlite:///tvmaze.db')
-engine = create_engine('postgresql://localhost/jarvis')
+    database_url = os.environ['DATABASE_URL']
+    engine = create_engine(database_url)
+    # engine = create_engine('sqlite:///tvmaze.db')
+
+    return engine
+
 
 # Create all tables in the engine. This is equivalent to "Create Table"
 # statements in raw SQL.
+engine = create_db_engine()
 Base.metadata.create_all(engine)
