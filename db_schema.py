@@ -1,10 +1,11 @@
 import os
 import sys 
-# import MySQLdb
+import psycopg2
 from sqlalchemy import Table, Column, ForeignKey, Integer, String, Boolean, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 Base = declarative_base()
 
@@ -26,7 +27,7 @@ class User(Base):
     __tablename__ = 'users'
 
     # Columns
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, unique=True)
     slack_id = Column(String(30), unique=True, nullable=False)
     slack_name = Column(String(30), unique=True, nullable=False)
     notifications = Column('Receive Notifications', Boolean, unique=False, default=True)
@@ -39,7 +40,7 @@ class TV_Series(Base):
     __tablename__ = 'tv_series'
 
     # Columns
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, unique=True)
     tvmaze_id = Column(Integer, unique=True, nullable=False)
     name = Column(String(100))
     status = Column(String(20))
@@ -54,21 +55,21 @@ class TV_Series(Base):
     followed_by = relationship('Follow', cascade='all, delete-orphan', back_populates='tv_series')
 
 
-# Create an engine that stores data in the local directory
-engine = create_engine('sqlite:///tvmaze.db')
+def create_db_session():
 
-# connection_string = "mysql://root:" + os.environ['JARVIS_DB_PW'] + "@127.0.0.1:3306/jarvis"
-# connection_string = "mysql://root:" + os.environ['JARVIS_DB_PW'] + "@127.0.0.1:3306/jarvis_test"
-#engine = create_engine(connection_string)
+    # engine = create_engine('sqlite:///tvmaze.db')
+    engine = create_engine('postgresql://localhost/jarvis')
+    Base.metadata.bind = engine
+    DBSession = sessionmaker(bind=engine)
+    session = DBSession()
+
+    return session
+
+
+# Create an engine that stores data in the local directory
+# engine = create_engine('sqlite:///tvmaze.db')
+engine = create_engine('postgresql://localhost/jarvis')
 
 # Create all tables in the engine. This is equivalent to "Create Table"
 # statements in raw SQL.
 Base.metadata.create_all(engine)
-
-
-
-'''
-To do:
-* Setup many-to-many relationship
-http://docs.sqlalchemy.org/en/rel_1_1/orm/basic_relationships.html#many-to-many
-'''

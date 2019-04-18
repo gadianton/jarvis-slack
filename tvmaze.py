@@ -4,9 +4,9 @@ import re
 import os
 import logging
 from datetime import datetime, date
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from db_schema import Base, User, TV_Series, Follow
+# from sqlalchemy import create_engine
+# from sqlalchemy.orm import sessionmaker
+from db_schema import Base, User, TV_Series, Follow, create_db_session
 
 # setup logging
 logger = logging.getLogger('main.tvmaze')
@@ -50,24 +50,32 @@ def search_for_series(text):
             
             series_output = series_name + series_year
             option = {
-                'text': series_output,
+                'text': {
+                    'type': 'plain_text',
+                    'text': series_output
+                },
                 'value': series_id
             }
-            payload.get('options').append(option)
+            payload['options'].append(option)
 
-    logger.info('Lookahead payload is completely generated.')
+    logger.info('Lookahead payload is complete')
+    logger.debug('Payload contents:\n{}'.format(payload))
 
     return payload
 
 
 def get_series_data_via_id(series_id):
-    series_lookup_url = API_URL + '/shows/' + str(series_id)
+    logger.info("Looking up series_id '{}'".format(series_id))
+    series_lookup_url = API_URL + '/shows/{}'.format(series_id)
 
     series_data = requests.get(series_lookup_url)
     status_code = series_data.status_code
 
     if status_code == 429:
         return ("The servers are busy. Try again in a few seconds.")
+    
+    logger.info("Found TV series for series_id '{}'".format(series_id))
+    logger.debug("Series data:\n{}".format(series_data.json()))
 
     return series_data.json()
 
@@ -89,22 +97,27 @@ def get_series_data(series_name):
         return ("I was unable to find '" + series_name + "'.")
     elif status_code == 429:
         return ("The servers are busy. Try again in a few seconds.")
+    
+    logger.info("Found series data for {}".format(series_name))
 
     return series_data.json()
 
 
-def get_episode_data (episode_url):
+def get_episode_data(episode_url):
 
     logger.info("Requesting episode found at " + episode_url)
 
     episode_data = requests.get(episode_url)
 
+    logger.info("Found episode.")
+    logger.debug("Episode data:\n{}".format(episode_data.json()))
+
     return episode_data.json()
 
 
-def follow_series(series_name, user_id, user_name):
-    series_data = get_series_data(series_name)
-    series_id = series_data.get('id')
+def add_series_to_watchlist(series_id, user_id, user_name):
+    series_data = get_series_data_via_id(series_id)
+    series_name = series_data['name']
 
     # Pass along message to user if response isn't a dictionary (i.e. doesn't contain data)
     # This is usually the result of a 404 status code when searching for a TV series match
@@ -175,19 +188,19 @@ def follow_series(series_name, user_id, user_name):
             user_id=user.id,
             is_following=True)
         session.add(follow_status)
-        output_text = "You are now following " + tv_series.name + " and " + \
-                      "will receive notification before a new episode airs."
+        output_text = "_You are now following " + tv_series.name + " and " + \
+                      "will receive notification before a new episode airs._"
 
     elif follow_status.is_following:
-        output_text = "You are already following " + tv_series.name + "."
+        output_text = "_You are already following " + tv_series.name + "._"
 
     else:
         session.query(Follow). \
             filter_by(tv_series_id=follow_status.tv_series_id). \
             filter_by(user_id=follow_status.user_id). \
             update({'is_following': True})
-        output_text = "You are now following " + tv_series.name + " and " + \
-                      "will receive notification before a new episode airs."
+        output_text = "_You are now following " + tv_series.name + " and " + \
+                      "will receive notification before a new episode airs._"
 
     session.commit()
     session.close()
@@ -195,7 +208,7 @@ def follow_series(series_name, user_id, user_name):
     return output_text
 
 
-def unfollow_series(series_name, user_id, user_name):
+def remove_series_from_watchlist(series_id, user_id):
 
     """
     * lookup TV series (get ID)
@@ -205,9 +218,6 @@ def unfollow_series(series_name, user_id, user_name):
     * otherwise, set is_following to false and notify user
     """
 
-    series_data = get_series_data(series_name)
-    series_id = series_data.get('id')
-
     session = create_db_session()
 
     tv_series = session.query(TV_Series). \
@@ -216,7 +226,7 @@ def unfollow_series(series_name, user_id, user_name):
 
     if not tv_series:
         session.close()
-        output_text = "Congratulations! You're already *not* following " + series_name + "."
+        output_text = "_Congratulations! You're already *not* following " + series_name + "._"
         return output_text
 
     user = session.query(User). \
@@ -229,8 +239,8 @@ def unfollow_series(series_name, user_id, user_name):
         first()
 
     if not follow_status or follow_status.is_following == False:
-        response_string = "Congratulations! You're already *not* following " + \
-                          tv_series.name + "."
+        response_string = "_Congratulations! You're already *not* following " + \
+                          tv_series.name + "._"
         session.close()
         return response_string
     else:
@@ -239,9 +249,9 @@ def unfollow_series(series_name, user_id, user_name):
             filter_by(user_id=follow_status.user_id). \
             update({'is_following': False})
 
-    response_string = "You will no longer receive notifications for " + \
+    response_string = "_You will no longer receive notifications for " + \
                        tv_series.name + " and are entitled to all the benefits " + \
-                      "(or lack) thereof."
+                      "(or lack) thereof._"
 
     session.commit()
     session.close()
@@ -312,24 +322,6 @@ def get_episodes_for_date(date):
     return episodes_for_date
 
 
-def create_db_session():
-
-    # connection_string = "mysql://root:" + os.environ['JARVIS_DB_PW'] + "@127.0.0.1:3306/jarvis"
-    # connection_string = "mysql://root:" + os.environ['JARVIS_DB_PW'] + "@127.0.0.1:3306/jarvis_test"
-    # engine = create_engine(connection_string)
-
-    engine = create_engine('sqlite:///tvmaze.db')
-    Base.metadata.bind = engine
-    DBSession = sessionmaker(bind=engine)
-    session = DBSession()
-
-    return session
-
-
-# if __name__ == "__main__":
-
-
-
 ### CHANGE DAILY NOTIFICATIONS BACK TO DATE VARIABLE (RATHER THAN STATIC)
 
 '''
@@ -343,14 +335,7 @@ When a new user is added, it should automatically create follow associations to 
 
 * consolidate repetitive code in 'follow_series' function
 * consolidate repetitive code between 'follow_series' and 'unfollow_series'
-* create notifications function and add to slack_loop or schedule
 
 * Document different tests - maybe write a test function for the Slack Bot
-* Limit modules to certain channels
-* research other TVmaze API features
-* add logging
 * let user know when an unknown airdate becomes known
-* add special suffixes to dates of episodes depending how far out they are
-
-
 '''
