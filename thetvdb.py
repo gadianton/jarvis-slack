@@ -48,6 +48,7 @@ def get_series_banner(series_id):
     response = requests.get(endpoint, params=params, headers=headers)
     banners = response.json().get('data')
     logger.info("Received banner data from TheTVDB.")
+    logger.debug("Banner data:\n{}".format(banners))
 
     highest_rating = {
         'image_url': '',
