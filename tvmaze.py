@@ -4,8 +4,6 @@ import re
 import os
 import logging
 from datetime import datetime, date
-# from sqlalchemy import create_engine
-# from sqlalchemy.orm import sessionmaker
 from db_schema import Base, User, TV_Series, Follow, create_db_session
 
 # setup logging
