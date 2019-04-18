@@ -47,12 +47,8 @@ def get_series_banner(series_id):
     logger.info("Sending request to TheTVDB")
     response = requests.get(endpoint, params=params, headers=headers)
     banners = response.json().get('data')
-    logger.info("Received banner data from TheTVDB.")
-<<<<<<< HEAD
+    logger.info("Received banner data from TheTVDB")
     logger.debug("Banner data received:\n{}".format(banners))
-=======
-    logger.debug("Banner data:\n{}".format(banners))
->>>>>>> dev
 
     highest_rating = {
         'image_url': '',
