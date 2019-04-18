@@ -9,6 +9,7 @@ from flask import Flask, request, Response, jsonify, json
 
 app = Flask(__name__)
 
+
 # setup logging
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -301,6 +302,7 @@ def inbound():
     logger.info('Sending HTTP Status 200 to requesting server')
     return '', 200
 
+
 def format_response_blocks(text):
 
     blocks = [
@@ -314,6 +316,7 @@ def format_response_blocks(text):
     ]
 
     return blocks
+
 
 @app.route('/', methods=['GET'])
 def test():
