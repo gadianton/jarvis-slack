@@ -79,9 +79,19 @@ def format_series_output(series_data, user_name):
 
     series_status = series_data['status']
     series_description = remove_html_tags(series_data['summary'])
+    imdb_id = series_data["externals"]["imdb"]
+    if imdb_id:
+        imdb_base_url = "https://www.imdb.com/title/"
+        imdb_url = imdb_base_url + imdb_id
+        series_description += " (<{}|IMDB>)".format(imdb_url)
 
     tvdb_series_id = series_data['externals']['thetvdb']
+    if not thetvdb.validate_series_id(tvdb_series_id):
+        tvdb_series_id = thetvdb.find_series_id_via_imdb(imdb_id)
     image_url = thetvdb.get_series_banner(tvdb_series_id)
+    if not image_url:
+        image_url = series_data["image"]["original"]
+        # image_url = series_data["image"]["medium"]
 
     try:
         network_name = series_data['network']['name']

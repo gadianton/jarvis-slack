@@ -5,27 +5,18 @@ from slackclient import SlackClient
 # setup logging
 logger = logging.getLogger('main.slack')
 
+# authenticate with Slack
+token = os.environ["SLACK_BOT_TOKEN"]
+slack_client = SlackClient(token)
 
-def authenticate_slack():
-
-    logger.info("Authenticating to Slack")
-
-    token = os.environ["SLACK_BOT_TOKEN"]
-    slack_client = SlackClient(token)
-
-    test_response = slack_client.api_call('api.test')
-    if not test_response.get('ok'):
-        # logger.error('API connection failed. Response error: <%s>', test_response.get('error'))
-        exit()
-
-    logger.info("Authentication complete.")
-    return slack_client
+test_response = slack_client.api_call('api.test')
+if not test_response.get('ok'):
+    logger.error('API connection failed. Response error: <%s>', test_response.get('error'))
 
 
 def post_message(blocks, channel_id=None, slack_id=None, ephemeral=False):
 
     logger.info("Sending message to slack")
-    slack_client = authenticate_slack()
 
     if ephemeral:
         post_type = 'chat.postEphemeral'
@@ -46,7 +37,6 @@ def post_message(blocks, channel_id=None, slack_id=None, ephemeral=False):
 def delete_message(channel_id, message_ts):
 
     logger.info("Deleting message from slack")
-    slack_client = authenticate_slack()
 
     response = slack_client.api_call("chat.delete", channel=channel_id, ts=message_ts, as_user=True)
     logger.info("Finished deleting message")
