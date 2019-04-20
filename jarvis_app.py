@@ -3,8 +3,8 @@ import logging
 import tvmaze
 import thetvdb
 from threading import Thread
-from slack import post_message, delete_message
-from datetime import datetime
+from slack import post_message, delete_message, post_dialog, post_file
+from datetime import datetime, date
 from flask import Flask, request, Response, jsonify, json
 
 app = Flask(__name__)
@@ -213,9 +213,10 @@ def format_episode_output(episode_url):
 
     date_format = '%Y-%m-%d'
     episode_date_object = datetime.strptime(episode_date, date_format)
-    today = datetime.today()
+    today = datetime.combine(date.today(), datetime.min.time())
     
     delta_days = (episode_date_object - today).days
+
     if delta_days == 0:
         days_output = "today"
     elif delta_days == 1:
@@ -243,6 +244,69 @@ def series_search():
     return jsonify(payload)
 
 
+@app.route('/spoiler', methods=['POST'])
+def create_spoiler_dialog():
+
+    req = request.form
+    logger.debug("/spoiler request received:\n{}".format(req))
+    trigger_id = req["trigger_id"]
+
+    ### Switch this to an dialog.open API call
+    ### https://api.slack.com/methods/dialog.open
+    ### Create new function for this in slack.py 
+
+    # payload = {
+    #     "trigger_id": trigger_id,
+    #     "dialog": {
+    #         "callback_id": "create_spoiler",
+    #         "title": "Create a spoiler",
+    #         "submit_label": "Post",
+    #         "notify_on_cancel": True,
+    #         "state": "placeholder",
+    #         "elements": [
+    #             {
+    #                 "type": "text",
+    #                 "label": "Spoiler title",
+    #                 "name": "spoiler_text",
+    #                 "placeholder": "Enter spoiler title here"
+    #             },
+    #             {
+    #                 "type": "textarea",
+    #                 "label": "Spoiler content",
+    #                 "name": "spoiler_content",
+    #                 "placeholder": "Enter spoiler content here"
+    #             }
+    #         ]
+    #     }
+    # }
+
+    dialog = {
+        "callback_id": "create_spoiler",
+        "title": "Create a spoiler",
+        "submit_label": "Post",
+        "notify_on_cancel": True,
+        "state": "placeholder",
+        "elements": [
+            {
+                "type": "text",
+                "label": "Spoiler subject",
+                "name": "spoiler_subject",
+                "placeholder": "Enter spoiler title here"
+            },
+            {
+                "type": "textarea",
+                "label": "Spoiler content",
+                "name": "spoiler_body",
+                "placeholder": "Enter spoiler content here"
+            }
+        ]
+    }
+
+    post_dialog(dialog, trigger_id)
+
+    return '', 200
+
+
 @app.route('/', methods=['POST'])
 def inbound():
 
@@ -250,59 +314,42 @@ def inbound():
     req = json.loads(request.form.get('payload'))
     logger.debug('Request data: \n{}'.format(req))
 
-    action = req['actions'][0]
-    action_id = action['action_id']
     user_name = req['user']['name']
     slack_id = req['user']['id']
     channel_id = req['channel']['id']
-    # message_ts = req['container']['message_ts']
+    callback_id = req.get('callback_id')
+    action = req.get('actions')
 
-    # if callback_id == 'tv_main_menu':
-    #     action = req.get('actions')[0].get('name')
-    #     if action == 'search':
-    #         payload = create_search_box()
-    #     elif action == 'watchlist':
-    #         logger.info("Received request for watchlist for user id: " + user_id)
-    #         payload = tvmaze.create_watchlist_output(user_id)
-    
-    if action_id == 'series_search':
-        series_id = action['selected_option']['value']
-        logger.info("Inbound request is a 'series_search'")
-        t = Thread(target=respond_to_series_request, args=(
-            series_id, channel_id, user_name, slack_id))
-        logger.info ("Starting thread to generate series output")
-        t.start()
-        # delete_message(channel_id, message_ts)
+    if action:
+        action_id = action[0]['action_id']
 
-    elif action_id == "add_to_watchlist":
-        series_id = action["value"]
-        output_text = tvmaze.add_series_to_watchlist(series_id, slack_id, user_name)
-        blocks = format_response_blocks(output_text)
-        post_message(blocks, channel_id=channel_id, slack_id=slack_id, ephemeral=True)
+        if action_id == 'series_search':
+            series_id = action['selected_option']['value']
+            logger.info("Inbound request is a 'series_search'")
+            t = Thread(target=respond_to_series_request, args=(
+                series_id, channel_id, user_name, slack_id))
+            logger.info ("Starting thread to generate series output")
+            t.start()
+            # delete_message(channel_id, message_ts)
 
-    elif action_id == "remove_from_watchlist":
-        series_id = action["value"]
-        output_text = tvmaze.remove_series_from_watchlist(series_id, slack_id)
-        blocks = format_response_blocks(output_text)
-        post_message(blocks, channel_id=channel_id, slack_id=slack_id, ephemeral=True)
+        elif action_id == "add_to_watchlist":
+            series_id = action["value"]
+            output_text = tvmaze.add_series_to_watchlist(series_id, slack_id, user_name)
+            blocks = format_response_blocks(output_text)
+            post_message(blocks, channel_id=channel_id, slack_id=slack_id, ephemeral=True)
 
-    # elif callback_id == 'watchlist':
-    #     action = req.get('actions')[0].get('name')
-    #     series_name = req.get('actions')[0].get('value')
-    #     if action == 'follow':
-    #         output_text = tvmaze.follow_series(series_name, user_id, user_name)
-    #         payload = {
-    #             'response_type:': 'ephemeral',
-    #             'replace_original': False,
-    #             'text': output_text
-        #     }
-        # elif action == 'unfollow':
-        #     output_text = tvmaze.unfollow_series(series_name, user_id, user_name)
-        #     payload = {
-        #         'response_type:': 'ephemeral',
-        #         'replace_original': False,
-        #         'text': output_text
-        #     }
+        elif action_id == "remove_from_watchlist":
+            series_id = action["value"]
+            output_text = tvmaze.remove_series_from_watchlist(series_id, slack_id)
+            blocks = format_response_blocks(output_text)
+            post_message(blocks, channel_id=channel_id, slack_id=slack_id, ephemeral=True)
+
+    if callback_id:
+        if callback_id == "create_spoiler":
+            subject = req['submission']['spoiler_subject']
+            body = req['submission']['spoiler_body']
+            title, content = format_spoiler_output(subject, body, user_name)
+            post_file(channel_id, content, title)
 
     logger.info('Sending HTTP Status 200 to requesting server')
     return '', 200
@@ -321,6 +368,14 @@ def format_response_blocks(text):
     ]
 
     return blocks
+
+
+def format_spoiler_output(subject, body, user_name):
+
+    title = "Spoiler: {} | By: {}".format(subject, user_name)
+    content = "SPOILER SUBJECT: {}\nAUTHOR: {}\nExpand spoiler at your own risk.\n\n\n{}".format(subject, user_name, body)
+
+    return title, content
 
 
 @app.route('/', methods=['GET'])

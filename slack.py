@@ -41,3 +41,20 @@ def delete_message(channel_id, message_ts):
     response = slack_client.api_call("chat.delete", channel=channel_id, ts=message_ts, as_user=True)
     logger.info("Finished deleting message")
     logger.debug('Server response from deleting message:\n{}'.format(response))
+
+
+def post_dialog(dialog, trigger_id):
+
+    logger.info("Posting dialog")
+    response = slack_client.api_call("dialog.open", dialog=dialog, trigger_id=trigger_id)
+    logger.info("Finished posting dialog")
+    logger.debug("Server response from posting dialog:\n{}".format(response))
+
+
+def post_file(channel_id, content, title):
+
+    channels = [channel_id]
+    logger.info("Posting spoiler content")
+    response = slack_client.api_call("files.upload", content=content, title=title, channels=channels)
+    logger.info("Finished posting spoiler content")
+    logger.debug("Server response from posting spoiler content:\n{}".format(response))
