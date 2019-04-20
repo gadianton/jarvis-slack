@@ -324,7 +324,7 @@ def inbound():
         action_id = action[0]['action_id']
 
         if action_id == 'series_search':
-            series_id = action['selected_option']['value']
+            series_id = action[0]['selected_option']['value']
             logger.info("Inbound request is a 'series_search'")
             t = Thread(target=respond_to_series_request, args=(
                 series_id, channel_id, user_name, slack_id))
