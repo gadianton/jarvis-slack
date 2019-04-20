@@ -1,7 +1,7 @@
+import re
 import logging
 import tvmaze
 import thetvdb
-import xml.etree.cElementTree as ET
 from threading import Thread
 from slack import post_message, delete_message
 from datetime import datetime
@@ -200,13 +200,8 @@ def format_series_output(series_data, user_name):
 
 def remove_html_tags(text):
 
-    try:
-        output_text = ''.join(ET.fromstring(text).itertext())
-    except:
-        output_text = text
-        # LOG ERROR MESSAGE
-
-    return output_text
+    pattern = r"<\w{1,2}>|</\w{1,2}>"
+    return re.sub(pattern, "", text)
 
 
 def format_episode_output(episode_url):
