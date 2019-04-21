@@ -89,6 +89,8 @@ def find_best_image(images, image_base_url):
 
 
 def get_series_network(series_id):
+    #### DEPRECATED
+    # Found this functionality in the TVmaze API
 
     logger.info("Getting series network from TVDB")
     endpoint = '{}/series/{}'.format(api_url, series_id)

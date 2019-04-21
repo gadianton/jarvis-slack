@@ -93,12 +93,12 @@ def format_series_output(series_data, user_name):
         image_url = series_data["image"]["original"]
         # image_url = series_data["image"]["medium"]
 
-    try:
-        network_name = series_data['network']['name']
-    except (KeyError, TypeError):
-        network_name = thetvdb.get_series_network(tvdb_series_id)
-        if not network_name:
-            network_name = 'Unlisted Network'
+    if series_data.get("network"):
+        network_name = series_data["network"]["name"]
+    elif series_data.get("webChannel"):
+        network_name = series_data["webChannel"]["name"]
+    else:
+        network_name = 'Unlisted Network'
 
     try:
         previous_episode_url = series_data['_links']['previousepisode']['href']
@@ -324,7 +324,7 @@ def inbound():
         action_id = action[0]['action_id']
 
         if action_id == 'series_search':
-            series_id = action['selected_option']['value']
+            series_id = action[0]['selected_option']['value']
             logger.info("Inbound request is a 'series_search'")
             t = Thread(target=respond_to_series_request, args=(
                 series_id, channel_id, user_name, slack_id))
