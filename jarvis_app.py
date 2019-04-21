@@ -333,13 +333,13 @@ def inbound():
             # delete_message(channel_id, message_ts)
 
         elif action_id == "add_to_watchlist":
-            series_id = action["value"]
+            series_id = action[0]["value"]
             output_text = tvmaze.add_series_to_watchlist(series_id, slack_id, user_name)
             blocks = format_response_blocks(output_text)
             post_message(blocks, channel_id=channel_id, slack_id=slack_id, ephemeral=True)
 
         elif action_id == "remove_from_watchlist":
-            series_id = action["value"]
+            series_id = action[0]["value"]
             output_text = tvmaze.remove_series_from_watchlist(series_id, slack_id)
             blocks = format_response_blocks(output_text)
             post_message(blocks, channel_id=channel_id, slack_id=slack_id, ephemeral=True)
