@@ -93,12 +93,12 @@ def format_series_output(series_data, user_name):
         image_url = series_data["image"]["original"]
         # image_url = series_data["image"]["medium"]
 
-    try:
-        network_name = series_data['network']['name']
-    except (KeyError, TypeError):
-        network_name = thetvdb.get_series_network(tvdb_series_id)
-        if not network_name:
-            network_name = 'Unlisted Network'
+    if series_data.get("network"):
+        network_name = series_data["network"]["name"]
+    elif series_data.get("webChannel"):
+        network_name = series_data["webChannel"]["name"]
+    else:
+        network_name = 'Unlisted Network'
 
     try:
         previous_episode_url = series_data['_links']['previousepisode']['href']
