@@ -234,9 +234,10 @@ if __name__ == "__main__":
     # begin tasks
     database_cleanup()
     database_update()
-    create_watchlist_report()
 
-
+    if date.today().weekday() == 0:
+        logger.info("Running Monday watchlist report")
+        create_watchlist_report()
 
 # To do:
 
