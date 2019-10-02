@@ -63,8 +63,9 @@ def create_db_session():
 
     return session
 
-def create_db_engine():
 
+def create_db_engine():
+    # Local URL: postgresql://localhost/jarvis
     database_url = os.environ['DATABASE_URL']
     engine = create_engine(database_url)
     # engine = create_engine('sqlite:///tvmaze.db')

@@ -27,8 +27,8 @@ def post_message(blocks, channel_id=None, slack_id=None, ephemeral=False):
         response = slack_client.api_call('im.open', user=slack_id)
         if response.get('ok'):
             channel_id = response.get('channel').get('id')
-    
-    logger.info("Sending message to slack")
+
+    logger.debug('Posting to channel_id: {}'.format(channel_id))
     response = slack_client.api_call(post_type, user=slack_id, channel=channel_id, blocks=blocks, as_user=True)
     logger.info('Finished posting message to Slack')
     logger.debug('Server response from posting output:\n{}'.format(response))

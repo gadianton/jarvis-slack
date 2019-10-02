@@ -12,6 +12,7 @@ watchlist_categories = {
     'cancelled': 'cancelled'
 }
 
+
 def database_update():
 
     logger.info('Starting database update')
@@ -114,8 +115,8 @@ def format_watchlist_report(watchlist_data):
         for series in watchlist[watchlist_categories['known']].values():
             days_until = (series['next_episode_date'] - today).days
             notification = '{} `s{}.e{}`'.format(
-                series['series_name'], \
-                str(series['next_episode_season']).zfill(2), \
+                series['series_name'],
+                str(series['next_episode_season']).zfill(2),
                 str(series['next_episode_number']).zfill(2)
             )
             if series['next_episode_number'] == 1:
@@ -133,7 +134,7 @@ def format_watchlist_report(watchlist_data):
         else:
             user_report += '\n_Read a book_'
         
-        user_report += '\n\n*TOMMOROW*'
+        user_report += '\n\n*TOMORROW*'
         episodes = [k for k,v in ordered_schedule.items() if v == 1]
         if episodes:
             for episode in episodes:
@@ -180,12 +181,12 @@ def send_watchlist_reports(watchlist_reports):
 
 
 def database_cleanup():
-
-    '''
+    """
     find tv series and users no longer used
     for each tv series in database...
     query follow table for tv series where no "is_following" fields are True
-    '''
+    :return:
+    """
 
     logger.info("Starting database cleanup.")
 

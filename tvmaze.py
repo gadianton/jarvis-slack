@@ -2,6 +2,7 @@ import requests
 import logging
 from datetime import datetime
 from db_schema import Base, User, TV_Series, Follow, create_db_session
+from slack import post_message
 
 # setup logging
 logger = logging.getLogger('main.tvmaze')
@@ -68,9 +69,12 @@ def get_series_data_via_id(series_id):
 
 
 def get_series_data(series_name):
-
-    # TVmaze uses a scoring system to determine the best TV series match for a user's search.
-    # This search will return a dictionary object with information about the matched series.
+    """
+    TVmaze uses a scoring system to determine the best TV series match for a user's search.
+    This search will return a dictionary object with information about the matched series.
+    :param series_name:
+    :return:
+    """
 
     series_search_url = API_URL + '/singlesearch/shows?q=' + series_name
 
@@ -79,9 +83,9 @@ def get_series_data(series_name):
     status_code = series_data.status_code
 
     if status_code == 404:
-        return ("I was unable to find '" + series_name + "'.")
+        return "I was unable to find '" + series_name + "'."
     elif status_code == 429:
-        return ("The servers are busy. Try again in a few seconds.")
+        return "The servers are busy. Try again in a few seconds."
     
     logger.info("Found series data for {}".format(series_name))
 
@@ -193,7 +197,6 @@ def add_series_to_watchlist(series_id, user_id, user_name):
 
 
 def remove_series_from_watchlist(series_id, user_id):
-
     """
     * lookup TV series (get ID)
     * match ID against tvmaze_id in database
@@ -243,47 +246,61 @@ def remove_series_from_watchlist(series_id, user_id):
     return response_string
 
 
-def create_watchlist_output(user_id):
-
-    '''
+def create_watchlist_output(slack_id, slack_name, channel_id):
+    """
     get user id (primary key)
     look up user in Follow table, return all tv_series_ids they follow
     look up names of tv_series_id
     return string with list of TV shows
-    '''
+    """
+    def send_empty_watchlist_notification():
+        text = "You're not following any TV shows yet. Use `/tv` to follow some shows first."
+        blocks = [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": text
+                }
+            }
+        ]
+        post_message(blocks, slack_id=slack_id, channel_id=channel_id, ephemeral=True)
 
     session = create_db_session()
 
     logger.info("Looking for user in database")
-
     user = session.query(User). \
-        filter_by(slack_id=user_id). \
+        filter_by(slack_id=slack_id). \
         first()
-
     if not user:
-        return ("You're not following any TV shows yet. Please use the `follow` command "
-               "to follow some TV shows first")
+        send_empty_watchlist_notification()
+        return None
 
     logger.info("Querying the user's watchlist")
-
-    watchlist = session.query(Follow). \
+    followed_series_ids = session.query(Follow.tv_series_id). \
         filter_by(user_id=user.id). \
         filter_by(is_following=True). \
         all()
+    if len(followed_series_ids) == 0:
+        send_empty_watchlist_notification()
+        return None
 
-    if len(watchlist) == 0:
-        return ("You're not following any TV shows yet. Please use the `follow` command "
-               "to follow some TV shows first")
+    watchlist_data = []
+    for series_id in followed_series_ids:
+        series_data = session.query(TV_Series).filter_by(id=series_id).scalar()
+        watchlist_item = {
+            'name': series_data.name,
+            'status': series_data.status,
+            'next_episode_date': series_data.next_episode_date
+        }
+        watchlist_data.append(watchlist_item)
 
-    output_string = "*TV shows on your watchlist:* \n"
-
-    for followed_series in watchlist:
-
-        series = session.query(TV_Series). \
-            filter_by(id=followed_series.tv_series_id). \
-            first()
-
-        output_string += series.name + "\n"
+    sorted_watchlist = sorted(watchlist_data, key=lambda k: k['name'])
+    output_string = "*WATCHLIST REPORT FOR {}:*\n".format(slack_name.upper())
+    for series in sorted_watchlist:
+        output_string += '\n*{}* | _status: {}_'.format(series['name'], series['status'].lower())
+        if series['status'] == 'Ended':
+            output_string += ' :x:'
 
     session.close()
 
