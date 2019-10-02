@@ -233,6 +233,22 @@ def format_episode_output(episode_url):
     return episode_output
 
 
+@app.route('/watchlist', methods=['POST'])
+def create_watchlist_report():
+
+    req = request.form
+    slack_id = req['user_id']
+    slack_name = req['user_name']
+    channel_id = req['channel_id']
+
+    payload = tvmaze.create_watchlist_output(slack_id, slack_name, channel_id)
+
+    if payload:
+        return jsonify(payload)
+    else:
+        return ""
+
+
 @app.route('/series-search', methods=['POST'])
 def series_search():
 
@@ -328,7 +344,7 @@ def inbound():
             logger.info("Inbound request is a 'series_search'")
             t = Thread(target=respond_to_series_request, args=(
                 series_id, channel_id, user_name, slack_id))
-            logger.info ("Starting thread to generate series output")
+            logger.info("Starting thread to generate series output")
             t.start()
             # delete_message(channel_id, message_ts)
 
